@@ -1,0 +1,262 @@
+---
+title: "Desapareguts Guerra Civil"
+author: "Jose Luis Herencia"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Càrrega del dataset
+
+En primer lloc, carreguem el conjunt de dades que hem descarregat de la web https://analisi.transparenciacatalunya.cat/Legislaci-just-cia/Cens-de-persones-desaparegudes-durant-la-Guerra-Ci/u2ix-2jr6
+
+```{r}
+df = read.csv("./Cens_de_persones_desaparegudes_durant_la_Guerra_Civil.csv", header=TRUE, sep=";")
+head(df)
+```
+
+Seleccionem únicament les variables amb les quals treballarem
+
+```{r}
+if (!require("dplyr")) install.packages("dplyr")
+library(dplyr)
+var = c("Id.Afectat", "Sexe", "Municipi.naixement", "Comarca.naixement", "Província.naixement", "Data.naixement",
+        "Període.naixement_1", "Període.naixement_2", "Municipi.habitual", "Comarca.habitual", "Província.habitual",
+        "És.voluntari", "Exèrcit", "Data.desaparició", "Període.desaparició_1", "Període.desaparició_2",
+        "Comarca.desaparició", "Província.desaparició", "És.afusellat", "Localitzat")
+cens_df = select(df, var)
+head(cens_df)
+```
+
+Visualitzem un detall dels estadístics de totes les variables
+
+```{r}
+summary(cens_df)
+```
+Canviem el nom de les columnes per eliminar els punts i fer més accessibles les variables.
+
+```{r}
+colnames(cens_df) = c('id', 'sexe', 'mun_naix', 'comarca_naix', 'prov_naix', 'data_naix', 'per_naix_1', 'per_naix_2', 'mun_hab', 'comarca_hab', 'prov_hab', 'voluntari', 'exercit', 'data_des', 'per_des_1', 'per_des_2', 'comarca_des', 'prov_des', 'afusellat', 'localitzat')
+```
+
+Convertim en variables categòriques les variables 'sexe', 'voluntari', 'exercit', 'afusellat' i 'localitzat'.
+
+```{r}
+cens_df$sexe = as.factor(cens_df$sexe)
+cens_df$voluntari = as.factor(cens_df$voluntari)
+cens_df$exercit = as.factor(cens_df$exercit)
+cens_df$afusellat = as.factor(cens_df$afusellat)
+cens_df$localitzat = as.factor(cens_df$localitzat)
+summary(cens_df)
+```
+Podem veure que les úniques variables amb valors nuls son per_naix_1, per_naix_2, per_des_1 i per_des_2, mentre que a més, la variable exercit conté valors en blanc. Per les variables categòriques 'sexe', 'voluntari', 'afusellat' i 'localitzat' tots els valors estan informats sota una de les dues categories correctes (home/dona i 0-false/1-true).
+
+Mitjançant gràfics comprovem que les variables 'sexe', 'voluntari', 'afusellat' i 'localitzat' contenen els valors correctes. Abans però, canviem les etiquetes de les categories 0 per false i 1 per true a les variables corresponents.
+
+```{r}
+levels(cens_df$voluntari) = c("false", "true")
+levels(cens_df$afusellat) = c("false", "true")
+levels(cens_df$localitzat) = c("false", "true")
+plot(x=cens_df$sexe, main="Desapareguts per sexe")
+plot(x=cens_df$voluntari, main="Desapareguts que eren voluntaris")
+plot(x=cens_df$afusellat, main="Desapareguts afusellats")
+plot(x=cens_df$localitzat, main="Desapareguts localitzats")
+```
+
+Ara explorem les variables data_naix i data_des, conjuntament amb per_naix_1, per_naix_2, per_des_1 i per_des_2. Per a estudiar els anys en què més desaparicions es van produir, o l'edat mitjana en desaparèixer, farem una aproximació mitjançant el per_naix_1, per_naix_2, data_naix, data_des, per_des_1 i per_des_2. Veiem que tenim valors buits en aquests casos. Per tant, el primer que farem serà crear dues noves variables (any_naix i any_des) que es nodriran en primer lloc del valor data_naix o data_des, si estan buits per_naix_1/per_des_1, si també estan buits del per_naix_2/per_des_2
+
+```{r}
+cens_df$any_naix=as.integer(substr(cens_df$data_naix, nchar(cens_df$data_naix)-3, nchar(cens_df$data_naix)))
+cens_df$any_des=as.integer(substr(cens_df$data_des, nchar(cens_df$data_des)-3, nchar(cens_df$data_des)))
+for (i in cens_df$id){
+  if (is.na(cens_df[i,"any_naix"])){
+    cens_df[i,"any_naix"]=as.integer(cens_df[i,"per_naix_1"])
+  }
+  if (is.na(cens_df[i,"any_des"])){
+    cens_df[i, "any_des"]=as.integer(cens_df[i,"per_des_1"])
+  }
+}
+cens_df$any_naix[is.na(cens_df$any_naix)]=cens_df$per_naix_2
+cens_df$any_des[is.na(cens_df$any_des)]=cens_df$per_des_2
+```
+
+Pel que fa a l'any de desaparició, pels que no la coneixem informarem com any l'inici de la Guerra Civil, és a dir, 1936.
+
+```{r}
+cens_df$any_des[is.na(cens_df$any_des)]=1936
+```
+Abans de crear la variable edat, representem les variables any_des i any_naix en boxplots per comprovar si hi ha valors atípics.
+
+```{r}
+boxplot(cens_df$any_naix, main="Boxplot any naixement")
+boxplot(cens_df$any_des, main="Boxplot any desaparició")
+```
+Observem valors atípics, tant a l'any de naixement com de desaparició.
+
+```{r}
+summary(cens_df$any_naix)
+summary(cens_df$any_des)
+```
+Veiem que l'outlier correspon a l'any de naixement 1090. Ha de tractar-se d'una errada a l'introduir les dades, i l'any correcte presumiblement sigui 1900. Per tant, el substituim.
+
+```{r}
+cens_df$any_naix[cens_df$any_naix==1090] = 1900
+boxplot(cens_df$any_naix, main="Boxplot any de naixement corregit")
+```
+En el cas de l'any de desaparició, observem que hi ha anys anteriors a la Guerra Civil. Tots aquests els substituirem per l'any d'inici, és a dir, l'any 1939. Pel que fa als posteriors a la finalització, els mantindrem de moment.
+
+```{r}
+cens_df$any_des[cens_df$any_des<1936] = 1936
+boxplot(cens_df$any_des, main= "Boxplot any desaparició corregit")
+```
+
+Ara calculem la variable edat, que a més, ens servirà per veure si els anys de naixement i desaparició son coherents entre si (any desaparició no pot ser anterior a any de naixement, i per tant, resultaria en una edat negativa)
+
+```{r}
+cens_df$edat = cens_df$any_des-cens_df$any_naix
+summary(cens_df$edat)
+```
+
+Efectivament, observem que hi ha edats negatives. Busquem aquests registres.
+
+```{r}
+cens_df[cens_df$edat<0 & !is.na(cens_df$edat), ]
+```
+
+Veiem que són únicament 4 registres, tres dels quals la causa ha estat que no es coneixia l'any de desaparició, i per tant s'ha informat 1936. L'altre cas es tracta d'un any de naixement erroni (1981) que molt probablement es tracti de 1891. Canviem aquest cas, i els altres tres registres els eliminarem.
+
+```{r}
+cens_df$any_naix[cens_df$edat == -42] = 1891
+cens_df$edat = cens_df$any_des-cens_df$any_naix
+cens_df = cens_df[cens_df$id != 4525 & cens_df$id !=4644 & cens_df$id != 4756, ]
+summary(cens_df)
+```
+
+Observem 3 registres amb tots els valors 'NA'. Eliminem aquests registres, i aprofitem per eliminar les variables amb les quals ja no treballarem (data naixement, periode_1, ...) i les reordenem
+
+```{r}
+vars = c("id", "sexe", "any_naix", "any_des", "edat", "mun_naix", "comarca_naix", "prov_naix", "mun_hab", "comarca_hab", "prov_hab", "comarca_des", "prov_des", "voluntari", "exercit", "afusellat", "localitzat")
+cens_df = cens_df[!is.na(cens_df$id), ]
+cens_df = cens_df[vars]
+summary(cens_df)
+```
+
+Observem que les variables categòriques 'afusellat', 'localitzat' i 'voluntari' no presenten problemes. Però no és així amb 'exercit', on hi ha 1772 sense informar. Representem aquests registres per veure si podem treure alguna conclusió.
+
+```{r}
+plot(cens_df$exercit, cens_df$voluntari, main="Desapareguts militars/voluntaris per bàndol", col=cens_df$voluntari)
+legend("topleft", legend=c("militar", "voluntari"), fill=c("pink", "black"))
+```
+
+A primera vista sembla que les proporcions son similars en ambdos bàndols, i què el bàndol sense identificar també té registres de les dues categories. Per tant, el que farem serà identificar tots aquests com "ES DESCONEIX". Per això, canviem l'etiqueta
+
+```{r}
+levels(cens_df$exercit)=c("ES DESCONEIX", "REBEL", "REPUBLICÀ")
+cens_df$exercit[is.na(cens_df$exercit)] = "ES DESCONEIX"
+summary(cens_df$exercit)
+```
+Finalment, només ens queda comprovar les variables relatives a municipi, comarca i província, tant de naixement com habitual o de desaparició. El primer que farem, per evitar duplicitats, serà passar-ho tot a majúscules.
+
+```{r}
+cens_df$mun_hab=toupper(cens_df$mun_hab)
+cens_df$mun_naix=toupper(cens_df$mun_naix)
+cens_df$comarca_des=toupper(cens_df$comarca_des)
+cens_df$comarca_hab=toupper(cens_df$comarca_hab)
+cens_df$comarca_naix=toupper(cens_df$comarca_naix)
+cens_df$prov_des=toupper(cens_df$prov_des)
+cens_df$prov_hab=toupper(cens_df$prov_hab)
+cens_df$prov_naix=toupper(cens_df$prov_naix)
+```
+A continuació comprovem els valors únics per províncies i comarques.
+
+```{r}
+sort(unique(cens_df$comarca_des))
+sort(unique(cens_df$comarca_hab))
+sort(unique(cens_df$comarca_naix))
+```
+
+Observem els mateixos valors en totes tres variables relacionades amb la comarca. Únicament ens trobem amb el fet que, no existeix cap nascut a la Val d'Aran, la qual cosa no ens suposa cap problema, i que el Pla d'Urgell està informat com a Pla d'Urgel (amb una sola L) a comarca habitual i de naixement. Farem aquest canvi per unificar el nom. També comprovarem les comarques buides ("") a que corresponen.
+
+```{r}
+cens_df$comarca_hab[cens_df$comarca_hab=="PLA D'URGEL"] = "PLA D'URGELL"
+cens_df$comarca_naix[cens_df$comarca_naix=="PLA D'URGEL"] = "PLA D'URGELL"
+cens_df[cens_df$comarca_hab=="", ]
+```
+
+En el cas que comarca habitual està buit, es perquè ni el municipi ni la província habituals estan informats. En aquest cas, informarem com a comarca habitual, municipi habitual i província habitual els mateixos informats com de naixement. Però sempre i quan aquests 3 camps estiguin buits.
+
+```{r}
+for(i in cens_df$id){
+  if(cens_df$mun_hab[cens_df$id==i]=="" & 
+     cens_df$comarca_hab[cens_df$id==i]=="" & 
+     cens_df$prov_hab[cens_df$id==i]==""){
+    cens_df$mun_hab[cens_df$id==i]=cens_df$mun_naix[cens_df$id==i]
+    cens_df$comarca_hab[cens_df$id==i]=cens_df$comarca_naix[cens_df$id==i]
+    cens_df$prov_hab[cens_df$id==i]=cens_df$prov_naix[cens_df$id==i]
+  }
+}
+```
+
+Ara comprovem les províncies.
+
+
+```{r}
+sort(unique(cens_df$prov_des))
+sort(unique(cens_df$prov_hab))
+sort(unique(cens_df$prov_naix))
+```
+
+Mirem aquells registres en què provincia i municipi habitual es troben buits per veure si els podem informar amb dades de naixement.
+
+```{r}
+cens_df[cens_df$prov_hab=="" & cens_df$mun_hab=="", ]
+```
+
+Observem que allà on no està informat, les dades territorials de naixement tampoc ho estan. Pel que fa als camps buits de desaparició, tampoc els podem deduir d'enlloc. Per tant, en aquests moments decidim omplir tots els camps buits amb el camp "ES DESCONEIX"
+
+```{r}
+cens_df$mun_naix[cens_df$mun_naix==""]="ES DESCONEIX"
+cens_df$mun_hab[cens_df$mun_hab==""]="ES DESCONEIX"
+cens_df$comarca_des[cens_df$comarca_des==""]="ES DESCONEIX"
+cens_df$comarca_hab[cens_df$comarca_hab==""]="ES DESCONEIX"
+cens_df$comarca_naix[cens_df$comarca_naix==""]="ES DESCONEIX"
+cens_df$prov_des[cens_df$prov_des==""]="ES DESCONEIX"
+cens_df$prov_hab[cens_df$prov_hab==""]="ES DESCONEIX"
+cens_df$prov_naix[cens_df$prov_naix==""]="ES DESCONEIX"
+```
+
+Ara comprovem quants municipis estan tant a la variable mun_hab com mun_naix.
+
+```{r}
+mun_hab=unique(cens_df$mun_hab)
+mun_naix=unique(cens_df$mun_naix)
+i=0
+for(mun in mun_hab){
+  if(mun %in% mun_naix){
+    i=i+1
+  }
+}
+print("Municipis habituals i de naixement:"); print(i)
+print("Total municipis habituals");print(length(mun_hab))
+print("Municipis no coincidents"); print(length(mun_hab)-i)
+```
+Per tant, hi ha 245 municipis no coincidents. Anem a mirar quins son per veure si són correctament introduits.
+
+```{r}
+for(mun in mun_hab){
+  if(!(mun %in% mun_naix)){
+    print(mun)
+  }
+}
+```
+A primera vista sembla tot correcte. Per tant, donarem per bó els resultats i el dataset com a preparat per la següent fase del projecte de visualització. Únicament queda exportar els resultats preprocessats.
+
+```{r}
+write.csv(cens_df, "./cens_guerra_civil.csv", row.names = TRUE, fileEncoding = "ISO-8859-1")
+```
+
