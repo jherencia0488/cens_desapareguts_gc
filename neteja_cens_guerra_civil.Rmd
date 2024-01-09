@@ -257,6 +257,8 @@ for(mun in mun_hab){
 A primera vista sembla tot correcte. Per tant, donarem per bó els resultats i el dataset com a preparat per la següent fase del projecte de visualització. Únicament queda exportar els resultats preprocessats.
 
 ```{r}
-write.csv(cens_df, "./cens_guerra_civil.csv", row.names = FALSE, fileEncoding = "ISO-8859-1")
+install.packages("xlsx")
+library(xlsx)
+write.xlsx(cens_df, "./cens_guerra_civil.xlsx", row.names = FALSE)
 ```
 
