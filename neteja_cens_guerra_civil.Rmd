@@ -153,10 +153,10 @@ plot(cens_df$exercit, cens_df$voluntari, main="Desapareguts militars/voluntaris 
 legend("topleft", legend=c("militar", "voluntari"), fill=c("pink", "black"))
 ```
 
-A primera vista sembla que les proporcions son similars en ambdos bàndols, i què el bàndol sense identificar també té registres de les dues categories. Per tant, el que farem serà identificar tots aquests com "ES DESCONEIX". Per això, canviem l'etiqueta
+A primera vista sembla que les proporcions son similars en ambdos bàndols, i què el bàndol sense identificar també té registres de les dues categories. Per tant, el que farem serà identificar tots aquests en un bàndol com "ES DESCONEIX". Per això, canviem l'etiqueta. Aprofitem per canviar també l'etiqueta REBEL per FEIXISTA per a què sigui més evidents els bàndols.
 
 ```{r}
-levels(cens_df$exercit)=c("ES DESCONEIX", "REBEL", "REPUBLICÀ")
+levels(cens_df$exercit)=c("ES DESCONEIX", "FEIXISTA", "REPUBLICÀ")
 cens_df$exercit[is.na(cens_df$exercit)] = "ES DESCONEIX"
 summary(cens_df$exercit)
 ```
@@ -257,7 +257,7 @@ for(mun in mun_hab){
 A primera vista sembla tot correcte. Per tant, donarem per bó els resultats i el dataset com a preparat per la següent fase del projecte de visualització. Únicament queda exportar els resultats preprocessats.
 
 ```{r}
-install.packages("xlsx")
+if (!require("xlsx")) install.packages("xlsx")
 library(xlsx)
 write.xlsx(cens_df, "./cens_guerra_civil.xlsx", row.names = FALSE)
 ```
